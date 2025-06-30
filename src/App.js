@@ -297,6 +297,12 @@ const PauseIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="cu
 const ResetIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 2v6h6M21 12a9 9 0 11-6-7.7"/></svg>;
 const SettingsIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/></svg>;
 const ZapIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10 13,2"/></svg>;
+const MicIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>;
+const SendIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9 22,2"/></svg>;
+const ChatIcon = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
+const CloseIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+const CheckIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20,6 9,17 4,12"/></svg>;
+const XIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 
 // SimpleLineChart Component (uses SVG, no external deps)
 const SimpleLineChart = ({ data, title, dataKeys, colors, width = 800, height = 400 }) => {
@@ -387,6 +393,356 @@ const PhaseIndicator = ({ phase }) => {
   );
 };
 
+// ConversationalAssistant Component
+const ConversationalAssistant = ({ onParameterChange, isOpen, onToggle }) => {
+  const [message, setMessage] = useState('');
+  const [history, setHistory] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [pendingSuggestion, setPendingSuggestion] = useState(null);
+
+  // Web Speech API
+  const startListening = () => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setMessage(transcript);
+        setIsListening(false);
+      };
+
+      recognition.onerror = () => {
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.start();
+    } else {
+      alert('Speech recognition not supported in this browser');
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!message.trim()) return;
+
+    setIsLoading(true);
+    const userMessage = message.trim();
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: userMessage }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get response');
+      }
+
+      const data = await response.json();
+      
+      const newHistoryItem = {
+        id: Date.now(),
+        userMessage,
+        summary: data.summary,
+        parameter_changes: data.parameter_changes,
+        timestamp: new Date().toLocaleTimeString(),
+        applied: false
+      };
+
+      setHistory(prev => [newHistoryItem, ...prev].slice(0, 5));
+      
+      if (Object.keys(data.parameter_changes).length > 0) {
+        setPendingSuggestion(newHistoryItem);
+      }
+
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to process message. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const applyChanges = (historyItem) => {
+    Object.entries(historyItem.parameter_changes).forEach(([key, value]) => {
+      onParameterChange(key, value);
+    });
+    
+    setHistory(prev => prev.map(item => 
+      item.id === historyItem.id ? { ...item, applied: true } : item
+    ));
+    setPendingSuggestion(null);
+  };
+
+  const rejectChanges = () => {
+    setPendingSuggestion(null);
+  };
+
+  if (!isOpen) {
+    return (
+      <div style={{
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        zIndex: 1000
+      }}>
+        <button
+          onClick={onToggle}
+          style={{
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            border: 'none',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'transform 0.2s',
+          }}
+          onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
+          onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+        >
+          <ChatIcon />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      right: 0,
+      width: '400px',
+      height: '100vh',
+      background: 'white',
+      boxShadow: '-4px 0 12px rgba(0,0,0,0.15)',
+      zIndex: 1000,
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: '20px',
+        borderBottom: '1px solid #e5e7eb',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white'
+      }}>
+        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>AI Assistant</h3>
+        <button
+          onClick={onToggle}
+          style={{
+            background: 'rgba(255,255,255,0.2)',
+            border: 'none',
+            color: 'white',
+            borderRadius: '4px',
+            padding: '8px',
+            cursor: 'pointer'
+          }}
+        >
+          <CloseIcon />
+        </button>
+      </div>
+
+      {/* Pending Suggestion */}
+      {pendingSuggestion && (
+        <div style={{
+          padding: '16px',
+          background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+          borderBottom: '1px solid #f59e0b',
+          borderLeft: '4px solid #f59e0b'
+        }}>
+          <div style={{ fontWeight: '600', marginBottom: '8px', color: '#92400e' }}>
+            Parameter Changes Suggested
+          </div>
+          <div style={{ fontSize: '14px', marginBottom: '12px', color: '#78350f' }}>
+            {pendingSuggestion.summary}
+          </div>
+          <div style={{ fontSize: '12px', marginBottom: '12px', color: '#78350f' }}>
+            Changes: {Object.entries(pendingSuggestion.parameter_changes).map(([key, value]) => 
+              `${key}: ${value}`
+            ).join(', ')}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => applyChanges(pendingSuggestion)}
+              style={{
+                background: '#22c55e',
+                color: 'white',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <CheckIcon /> Apply
+            </button>
+            <button
+              onClick={rejectChanges}
+              style={{
+                background: '#ef4444',
+                color: 'white',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <XIcon /> Reject
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Chat History */}
+      <div style={{
+        flex: 1,
+        padding: '16px',
+        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px'
+      }}>
+        {history.length === 0 ? (
+          <div style={{
+            textAlign: 'center',
+            color: '#6b7280',
+            fontSize: '14px',
+            marginTop: '40px'
+          }}>
+            <div style={{ marginBottom: '12px' }}>💬</div>
+            <div>Ask me to adjust parameters!</div>
+            <div style={{ fontSize: '12px', marginTop: '8px' }}>
+              Try: "Make it more resilient" or "Simulate a crisis at day 80"
+            </div>
+          </div>
+        ) : (
+          history.map((item) => (
+            <div key={item.id} style={{
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '12px',
+              background: item.applied ? '#f0f9ff' : 'white'
+            }}>
+              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>
+                {item.timestamp} {item.applied && '✓ Applied'}
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '6px' }}>
+                You: {item.userMessage}
+              </div>
+              <div style={{ fontSize: '14px', color: '#374151' }}>
+                Assistant: {item.summary}
+              </div>
+              {Object.keys(item.parameter_changes).length > 0 && (
+                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
+                  Parameters: {Object.entries(item.parameter_changes).map(([key, value]) => 
+                    `${key}: ${value}`
+                  ).join(', ')}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Input Area */}
+      <div style={{
+        padding: '16px',
+        borderTop: '1px solid #e5e7eb',
+        background: '#f9fafb'
+      }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Ask me to adjust parameters..."
+            style={{
+              flex: 1,
+              minHeight: '40px',
+              maxHeight: '120px',
+              padding: '8px 12px',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              fontSize: '14px',
+              resize: 'vertical'
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+              }
+            }}
+          />
+          <button
+            onClick={startListening}
+            disabled={isListening || isLoading}
+            style={{
+              padding: '10px',
+              border: 'none',
+              borderRadius: '6px',
+              background: isListening ? '#ef4444' : '#6b7280',
+              color: 'white',
+              cursor: isListening || isLoading ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <MicIcon />
+          </button>
+          <button
+            onClick={sendMessage}
+            disabled={!message.trim() || isLoading}
+            style={{
+              padding: '10px',
+              border: 'none',
+              borderRadius: '6px',
+              background: !message.trim() || isLoading ? '#d1d5db' : '#3b82f6',
+              color: 'white',
+              cursor: !message.trim() || isLoading ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            {isLoading ? '...' : <SendIcon />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /*───────────────────────────────────────────────
   Main Dashboard App Component
 ───────────────────────────────────────────────*/
@@ -398,6 +754,7 @@ export default function App() {
   const [selectedView, setSelectedView] = useState('stocks');
   const [showSettings, setShowSettings] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
+  const [showAssistant, setShowAssistant] = useState(false);
 
   useEffect(() => {
     if (isRunning) {
@@ -758,6 +1115,13 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* Conversational Assistant */}
+        <ConversationalAssistant
+          onParameterChange={handleParamChange}
+          isOpen={showAssistant}
+          onToggle={() => setShowAssistant(!showAssistant)}
+        />
 
       </div>
     </div>
