@@ -446,6 +446,39 @@ const SimpleLineChart = ({ data, title, dataKeys, colors, width = 800, height = 
   ]);
 };
 
+// ────────────────────────────────────────
+// parameter definitions for dynamic UI
+const paramsConfig = [
+  // 🎯 Core Parameters
+  { key: 'learning_rate',           label: 'Learning Rate',            min: 0,   max: 1,   step: 0.01 },
+  { key: 'adaptation_rate',         label: 'Adaptation Rate',          min: 0,   max: 1,   step: 0.01 },
+  { key: 'feedback_strength',       label: 'Feedback Strength',        min: 0,   max: 1,   step: 0.01 },
+  { key: 'transformation_threshold',label: 'Transformation Threshold', min: 0,   max: 1,   step: 0.01 },
+
+  // 🌍 Environmental & Crisis
+  { key: 'crisis_intensity',        label: 'Crisis Intensity',         min: 0,   max: 1,   step: 0.01 },
+  { key: 'volatility_level',        label: 'Volatility Level',         min: 0,   max: 1,   step: 0.01 },
+  { key: 'uncertainty_level',       label: 'Uncertainty Level',        min: 0,   max: 1,   step: 0.01 },
+  { key: 'complexity_level',        label: 'Complexity Level',         min: 0,   max: 1,   step: 0.01 },
+  { key: 'ambiguity_level',         label: 'Ambiguity Level',          min: 0,   max: 1,   step: 0.01 },
+
+  // 📊 Baseline Capabilities
+  { key: 'social_connectivity_baseline', label: 'Social Connectivity',  min: 0,   max: 1,   step: 0.01 },
+  { key: 'digital_inclusion_baseline',   label: 'Digital Inclusion',    min: 0,   max: 1,   step: 0.01 },
+  { key: 'resource_availability_baseline', label: 'Resource Availability', min: 0, max: 1, step: 0.01 },
+  { key: 'technological_access_baseline', label: 'Technological Access',  min: 0,   max: 1,   step: 0.01 },
+
+  // ⏱️ Timing & Cycle
+  { key: 'cycle_duration',        label: 'Cycle Duration (days)',      min: 1,   max: 100, step: 1 },
+  { key: 'crisis_start',          label: 'Crisis Start Time (days)',   min: 1,   max: 200, step: 1 },
+  { key: 'crisis_duration',       label: 'Crisis Duration (days)',    min: 1,   max: 50,  step: 1 },
+  { key: 'panarchy_enabled',      label: 'Panarchy Enabled',           type: 'checkbox' },
+
+  // 🔄 Hidden Panarchy Phases (omit from UI)
+  // …
+];
+// ────────────────────────────────────────
+
 // Simple Icons
 const PlayIcon = () => React.createElement('svg', { width: '20', height: '20', viewBox: '0 0 24 24', fill: 'currentColor' },
   React.createElement('path', { d: 'M8 5v14l11-7z' })
@@ -1033,6 +1066,67 @@ export default function App() {
           }, 'Current adaptive cycle stage')
         ])
       ])
+    ]),
+
+    // Settings Panel
+    showSettings && React.createElement('div', {
+      key: 'settings-panel',
+      style: {
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderRadius: '12px',
+        padding: '24px',
+        marginBottom: '24px',
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+        border: '1px solid #e5e7eb'
+      }
+    }, [
+      React.createElement('h3', {
+        key: 'settings-title',
+        style: { fontSize: '20px', fontWeight: 'bold', color: '#1f2937', marginBottom: '24px' }
+      }, '⚙️ Parameters'),
+      React.createElement('div', {
+        key: 'params-grid',
+        style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px' }
+      }, paramsConfig.map(({ key, label, min, max, step, type }) => 
+        React.createElement('div', { 
+          key: key, 
+          style: { margin: '0.75rem 0' } 
+        }, [
+          React.createElement('label', { 
+            key: 'label',
+            style: { fontWeight: 500, marginRight: '0.5rem', display: 'block', marginBottom: '8px' } 
+          }, label),
+          type === 'checkbox' ? 
+            React.createElement('input', {
+              key: 'input',
+              type: 'checkbox',
+              checked: !!params[key],
+              onChange: e => handleParamChange(key, e.target.checked),
+              style: { width: '20px', height: '20px', cursor: 'pointer' }
+            }) : 
+            React.createElement('div', { 
+              key: 'slider-container',
+              style: { display: 'flex', alignItems: 'center', gap: '10px' }
+            }, [
+              React.createElement('input', {
+                key: 'slider',
+                type: 'range',
+                min: min,
+                max: max,
+                step: step,
+                value: params[key],
+                onChange: e => handleParamChange(key, parseFloat(e.target.value)),
+                style: { flex: 1, cursor: 'pointer' }
+              }),
+              React.createElement('span', { 
+                key: 'value',
+                style: { marginLeft: '0.5rem', fontWeight: 600, minWidth: '80px', textAlign: 'right' } 
+              }, 
+                params[key].toFixed(step < 1 ? 2 : 0) + (step < 1 ? '' : ' days')
+              )
+            ])
+        ])
+      ))
     ])
   ]));
 }
