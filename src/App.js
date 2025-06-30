@@ -752,7 +752,7 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [params, setParams] = useState(model.params);
   const [selectedView, setSelectedView] = useState('stocks');
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(true);
   const [forceUpdate, setForceUpdate] = useState(0);
   const [showAssistant, setShowAssistant] = useState(false);
 
