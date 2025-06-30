@@ -1,3 +1,4 @@
+import CKICASModel from './CKICASModel';
 // CKICAS Dashboard - JSX Fixed Version
 // Copy this entire file to App.js in StackBlitz
 
