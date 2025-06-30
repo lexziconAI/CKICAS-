@@ -1,5 +1,70 @@
 import React, { useState, useEffect } from 'react';
 
+// Add modern CSS animations
+const modernStyles = `
+  @keyframes slideInRight {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slideInUp {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  /* Modern slider styles */
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    height: 20px;
+    width: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    cursor: pointer;
+    box-shadow: 0 3px 6px rgba(102, 126, 234, 0.4);
+    transition: all 0.2s ease;
+  }
+  
+  input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.6);
+  }
+  
+  input[type="range"]::-moz-range-thumb {
+    height: 20px;
+    width: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 3px 6px rgba(102, 126, 234, 0.4);
+    transition: all 0.2s ease;
+  }
+  
+  input[type="range"]::-moz-range-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.6);
+  }
+`;
+
+// Inject styles
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = modernStyles;
+  document.head.appendChild(styleSheet);
+}
+
 /*───────────────────────────────────────────────
   CKICASModel Class
 ───────────────────────────────────────────────*/
@@ -303,6 +368,8 @@ const ChatIcon = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="non
 const CloseIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 const CheckIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20,6 9,17 4,12"/></svg>;
 const XIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+const SlidersIcon = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>;
+const TabIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>;
 
 // SimpleLineChart Component (uses SVG, no external deps)
 const SimpleLineChart = ({ data, title, dataKeys, colors, width = 800, height = 400 }) => {
@@ -389,6 +456,657 @@ const PhaseIndicator = ({ phase }) => {
         backgroundColor: phaseColors[phase]
       }} />
       <span style={{ fontSize: '14px', fontWeight: '500' }}>{phaseNames[phase]}</span>
+    </div>
+  );
+};
+
+// Modern Parameter Adjustment Panel Component
+const ModernParameterPanel = ({ 
+  isOpen, 
+  onToggle, 
+  mode, 
+  onModeChange, 
+  params, 
+  onParameterChange,
+  paramsConfig 
+}) => {
+  const [message, setMessage] = useState('');
+  const [history, setHistory] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [pendingSuggestion, setPendingSuggestion] = useState(null);
+  const [showToast, setShowToast] = useState(false);
+  const [lastChanged, setLastChanged] = useState('');
+
+  // Web Speech API for AI mode
+  const startListening = () => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => setIsListening(true);
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setMessage(transcript);
+        setIsListening(false);
+      };
+      recognition.onerror = () => setIsListening(false);
+      recognition.onend = () => setIsListening(false);
+      recognition.start();
+    } else {
+      alert('Speech recognition not supported in this browser');
+    }
+  };
+
+  // AI message processing
+  const sendMessage = async () => {
+    if (!message.trim()) return;
+
+    setIsLoading(true);
+    const userMessage = message.trim();
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMessage }),
+      });
+
+      if (!response.ok) throw new Error('Failed to get response');
+
+      const data = await response.json();
+      
+      const newHistoryItem = {
+        id: Date.now(),
+        userMessage,
+        summary: data.summary,
+        parameter_changes: data.parameter_changes,
+        timestamp: new Date().toLocaleTimeString(),
+        applied: false
+      };
+
+      setHistory(prev => [newHistoryItem, ...prev].slice(0, 5));
+      
+      if (Object.keys(data.parameter_changes).length > 0) {
+        setPendingSuggestion(newHistoryItem);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to process message. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Apply AI suggestions
+  const applyChanges = (historyItem) => {
+    Object.entries(historyItem.parameter_changes).forEach(([key, value]) => {
+      onParameterChange(key, value);
+    });
+    
+    setHistory(prev => prev.map(item => 
+      item.id === historyItem.id ? { ...item, applied: true } : item
+    ));
+    setPendingSuggestion(null);
+    showChangeToast('AI suggestions applied');
+  };
+
+  // Manual parameter change with feedback
+  const handleManualChange = (key, value) => {
+    onParameterChange(key, value);
+    setLastChanged(key);
+    showChangeToast(`${key.replace(/_/g, ' ')} updated`);
+  };
+
+  const showChangeToast = (message) => {
+    setLastChanged(message);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 2000);
+  };
+
+  // Floating Action Button
+  if (!isOpen) {
+    return (
+      <div style={{
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        zIndex: 1000
+      }}>
+        <button
+          onClick={onToggle}
+          style={{
+            width: '72px',
+            height: '72px',
+            borderRadius: '50%',
+            border: 'none',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            cursor: 'pointer',
+            boxShadow: '0 8px 32px rgba(102, 126, 234, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            backdropFilter: 'blur(10px)',
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'scale(1.1) translateY(-2px)';
+            e.target.style.boxShadow = '0 12px 40px rgba(102, 126, 234, 0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'scale(1) translateY(0)';
+            e.target.style.boxShadow = '0 8px 32px rgba(102, 126, 234, 0.3)';
+          }}
+        >
+          <SlidersIcon />
+        </button>
+        
+        {/* Toast Notification */}
+        {showToast && (
+          <div style={{
+            position: 'fixed',
+            bottom: '120px',
+            right: '24px',
+            background: 'rgba(34, 197, 94, 0.95)',
+            color: 'white',
+            padding: '12px 20px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: '500',
+            boxShadow: '0 8px 32px rgba(34, 197, 94, 0.3)',
+            backdropFilter: 'blur(10px)',
+            animation: 'slideInUp 0.3s ease-out',
+            zIndex: 1001
+          }}>
+            ✓ {lastChanged}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      right: 0,
+      width: '480px',
+      height: '100vh',
+      background: 'rgba(255, 255, 255, 0.95)',
+      backdropFilter: 'blur(20px)',
+      boxShadow: '-8px 0 32px rgba(0, 0, 0, 0.1)',
+      zIndex: 1000,
+      display: 'flex',
+      flexDirection: 'column',
+      animation: 'slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: '24px',
+        borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>Parameter Adjustment</h3>
+          <button
+            onClick={onToggle}
+            style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              border: 'none',
+              color: 'white',
+              borderRadius: '8px',
+              padding: '8px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <CloseIcon />
+          </button>
+        </div>
+        
+        {/* Mode Tabs */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {[
+            { id: 'manual', label: 'Manual', icon: '🎛️' },
+            { id: 'ai', label: 'AI Assistant', icon: '🤖' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => onModeChange(tab.id)}
+              style={{
+                flex: 1,
+                padding: '12px 16px',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                background: mode === tab.id 
+                  ? 'rgba(255, 255, 255, 0.25)' 
+                  : 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                transition: 'all 0.2s ease',
+                backdropFilter: 'blur(10px)'
+              }}
+            >
+              <span>{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        {mode === 'manual' ? (
+          <ManualParameterMode 
+            params={params}
+            paramsConfig={paramsConfig}
+            onParameterChange={handleManualChange}
+          />
+        ) : (
+          <AIParameterMode
+            message={message}
+            setMessage={setMessage}
+            history={history}
+            isLoading={isLoading}
+            isListening={isListening}
+            pendingSuggestion={pendingSuggestion}
+            onSendMessage={sendMessage}
+            onStartListening={startListening}
+            onApplyChanges={applyChanges}
+            onRejectChanges={() => setPendingSuggestion(null)}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Manual Parameter Mode Component
+const ManualParameterMode = ({ params, paramsConfig, onParameterChange }) => {
+  const parameterGroups = {
+    'Core Parameters': ['learning_rate', 'adaptation_rate', 'feedback_strength', 'transformation_threshold'],
+    'Environmental & Crisis': ['crisis_intensity', 'volatility_level', 'uncertainty_level', 'complexity_level', 'ambiguity_level'],
+    'Baseline Capabilities': ['social_connectivity_baseline', 'digital_inclusion_baseline', 'resource_availability_baseline', 'technological_access_baseline'],
+    'Timing & Cycles': ['cycle_duration', 'crisis_start', 'crisis_duration', 'panarchy_enabled']
+  };
+
+  return (
+    <div style={{ 
+      padding: '24px', 
+      height: '100%', 
+      overflowY: 'auto',
+      background: 'linear-gradient(180deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.8) 100%)'
+    }}>
+      {Object.entries(parameterGroups).map(([groupName, paramKeys]) => (
+        <div key={groupName} style={{ marginBottom: '32px' }}>
+          <h4 style={{ 
+            fontSize: '16px', 
+            fontWeight: '600', 
+            color: '#1e293b', 
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span style={{
+              width: '4px',
+              height: '20px',
+              background: 'linear-gradient(135deg, #667eea, #764ba2)',
+              borderRadius: '2px'
+            }} />
+            {groupName}
+          </h4>
+          
+          <div style={{ display: 'grid', gap: '20px' }}>
+            {paramKeys.map(key => {
+              const config = paramsConfig.find(p => p.key === key);
+              if (!config) return null;
+              
+              return (
+                <ModernParameterControl
+                  key={key}
+                  config={config}
+                  value={params[key]}
+                  onChange={(value) => onParameterChange(key, value)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Modern Parameter Control Component
+const ModernParameterControl = ({ config, value, onChange }) => {
+  const { key, label, min, max, step, type } = config;
+  
+  if (type === 'checkbox') {
+    return (
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.7)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '12px',
+        padding: '20px',
+        border: '1px solid rgba(148, 163, 184, 0.2)',
+        transition: 'all 0.2s ease'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>{label}</span>
+          <label style={{
+            position: 'relative',
+            display: 'inline-block',
+            width: '52px',
+            height: '28px'
+          }}>
+            <input
+              type="checkbox"
+              checked={!!value}
+              onChange={(e) => onChange(e.target.checked)}
+              style={{ opacity: 0, width: 0, height: 0 }}
+            />
+            <span style={{
+              position: 'absolute',
+              cursor: 'pointer',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: value ? 'linear-gradient(135deg, #22c55e, #16a34a)' : '#e5e7eb',
+              borderRadius: '28px',
+              transition: 'all 0.3s ease',
+              '&:before': {
+                position: 'absolute',
+                content: '""',
+                height: '20px',
+                width: '20px',
+                left: value ? '28px' : '4px',
+                bottom: '4px',
+                background: 'white',
+                borderRadius: '50%',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
+              }
+            }} />
+          </label>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      background: 'rgba(255, 255, 255, 0.7)',
+      backdropFilter: 'blur(10px)',
+      borderRadius: '12px',
+      padding: '20px',
+      border: '1px solid rgba(148, 163, 184, 0.2)',
+      transition: 'all 0.2s ease'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>{label}</label>
+        <span style={{
+          background: 'linear-gradient(135deg, #667eea, #764ba2)',
+          color: 'white',
+          padding: '4px 12px',
+          borderRadius: '12px',
+          fontSize: '12px',
+          fontWeight: '600'
+        }}>
+          {value?.toFixed ? value.toFixed(step < 1 ? 2 : 0) : value}{step < 1 ? '' : ' days'}
+        </span>
+      </div>
+      
+      <div style={{ position: 'relative' }}>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          style={{
+            width: '100%',
+            height: '6px',
+            borderRadius: '3px',
+            background: `linear-gradient(to right, #667eea 0%, #667eea ${((value - min) / (max - min)) * 100}%, #e2e8f0 ${((value - min) / (max - min)) * 100}%, #e2e8f0 100%)`,
+            outline: 'none',
+            cursor: 'pointer',
+            WebkitAppearance: 'none',
+            appearance: 'none'
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
+// AI Parameter Mode Component
+const AIParameterMode = ({ 
+  message, 
+  setMessage, 
+  history, 
+  isLoading, 
+  isListening, 
+  pendingSuggestion,
+  onSendMessage,
+  onStartListening,
+  onApplyChanges,
+  onRejectChanges
+}) => {
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Pending Suggestion */}
+      {pendingSuggestion && (
+        <div style={{
+          margin: '16px',
+          padding: '20px',
+          background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+          borderRadius: '12px',
+          border: '1px solid #f59e0b',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{ fontWeight: '600', marginBottom: '8px', color: '#92400e' }}>
+            🎯 Parameter Changes Suggested
+          </div>
+          <div style={{ fontSize: '14px', marginBottom: '12px', color: '#78350f' }}>
+            {pendingSuggestion.summary}
+          </div>
+          <div style={{ fontSize: '12px', marginBottom: '16px', color: '#78350f' }}>
+            <strong>Changes:</strong> {Object.entries(pendingSuggestion.parameter_changes).map(([key, value]) => 
+              `${key}: ${value}`
+            ).join(', ')}
+          </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={() => onApplyChanges(pendingSuggestion)}
+              style={{
+                background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <CheckIcon /> Apply Changes
+            </button>
+            <button
+              onClick={onRejectChanges}
+              style={{
+                background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <XIcon /> Reject
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Chat History */}
+      <div style={{
+        flex: 1,
+        padding: '16px',
+        overflowY: 'auto',
+        background: 'linear-gradient(180deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.8) 100%)'
+      }}>
+        {history.length === 0 ? (
+          <div style={{
+            textAlign: 'center',
+            padding: '40px 20px',
+            color: '#6b7280'
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🤖</div>
+            <div style={{ fontSize: '16px', fontWeight: '500', marginBottom: '8px' }}>AI Assistant Ready</div>
+            <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
+              Ask me to adjust parameters using natural language:
+              <br />
+              <em>"Make it more resilient"</em>
+              <br />
+              <em>"Simulate a crisis at day 80"</em>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {history.map((item) => (
+              <div key={item.id} style={{
+                background: item.applied ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255, 255, 255, 0.7)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '12px',
+                padding: '16px',
+                border: `1px solid ${item.applied ? 'rgba(34, 197, 94, 0.3)' : 'rgba(148, 163, 184, 0.2)'}`,
+                transition: 'all 0.2s ease'
+              }}>
+                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{item.timestamp}</span>
+                  {item.applied && <span style={{ color: '#22c55e', fontWeight: '500' }}>✓ Applied</span>}
+                </div>
+                <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '6px', color: '#1f2937' }}>
+                  You: {item.userMessage}
+                </div>
+                <div style={{ fontSize: '14px', color: '#374151', marginBottom: '8px' }}>
+                  Assistant: {item.summary}
+                </div>
+                {Object.keys(item.parameter_changes).length > 0 && (
+                  <div style={{ fontSize: '12px', color: '#6b7280', background: 'rgba(148, 163, 184, 0.1)', padding: '8px', borderRadius: '6px' }}>
+                    <strong>Parameters:</strong> {Object.entries(item.parameter_changes).map(([key, value]) => 
+                      `${key}: ${value}`
+                    ).join(', ')}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Input Area */}
+      <div style={{
+        padding: '20px',
+        borderTop: '1px solid rgba(148, 163, 184, 0.2)',
+        background: 'rgba(255, 255, 255, 0.95)',
+        backdropFilter: 'blur(10px)'
+      }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Ask me to adjust parameters..."
+            style={{
+              flex: 1,
+              minHeight: '44px',
+              maxHeight: '120px',
+              padding: '12px 16px',
+              border: '1px solid rgba(148, 163, 184, 0.3)',
+              borderRadius: '12px',
+              fontSize: '14px',
+              resize: 'vertical',
+              background: 'rgba(255, 255, 255, 0.8)',
+              backdropFilter: 'blur(10px)',
+              outline: 'none',
+              transition: 'all 0.2s ease'
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                onSendMessage();
+              }
+            }}
+          />
+          <button
+            onClick={onStartListening}
+            disabled={isListening || isLoading}
+            style={{
+              padding: '12px',
+              border: 'none',
+              borderRadius: '12px',
+              background: isListening 
+                ? 'linear-gradient(135deg, #ef4444, #dc2626)' 
+                : 'linear-gradient(135deg, #6b7280, #4b5563)',
+              color: 'white',
+              cursor: isListening || isLoading ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+            }}
+          >
+            <MicIcon />
+          </button>
+          <button
+            onClick={onSendMessage}
+            disabled={!message.trim() || isLoading}
+            style={{
+              padding: '12px',
+              border: 'none',
+              borderRadius: '12px',
+              background: !message.trim() || isLoading 
+                ? 'linear-gradient(135deg, #d1d5db, #9ca3af)' 
+                : 'linear-gradient(135deg, #3b82f6, #2563eb)',
+              color: 'white',
+              cursor: !message.trim() || isLoading ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+            }}
+          >
+            {isLoading ? '...' : <SendIcon />}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -752,9 +1470,11 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [params, setParams] = useState(model.params);
   const [selectedView, setSelectedView] = useState('stocks');
-  const [showSettings, setShowSettings] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
   const [showAssistant, setShowAssistant] = useState(false);
+  const [showParameterPanel, setShowParameterPanel] = useState(false);
+  const [parameterMode, setParameterMode] = useState('manual'); // 'manual' or 'ai'
 
   useEffect(() => {
     if (isRunning) {
@@ -881,16 +1601,6 @@ export default function App() {
                 }}>
                 <ZapIcon /><span>Fast Forward (2 years)</span>
               </button>
-              <button onClick={() => setShowSettings(!showSettings)}
-                style={{
-                  padding: '12px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600',
-                  fontSize: '14px', color: 'white',
-                  background: 'linear-gradient(to right, #8b5cf6, #7c3aed)',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                }}>
-                <SettingsIcon /><span>Parameters</span>
-              </button>
             </div>
             <div style={{
               background: 'linear-gradient(to right, #dbeafe, #f3e8ff)',
@@ -970,11 +1680,32 @@ export default function App() {
               </p>
               <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '12px' }}>🚀 Getting Started</h3>
               <ol style={{ paddingLeft: '20px', marginBottom: '20px' }}>
-                <li>Click "Run Simulation" to start</li>
-                <li>Switch between chart views to see different aspects</li>
-                <li>Adjust parameters to test scenarios</li>
+                <li>Click "Run Simulation" to start the dashboard</li>
+                <li>Click the <strong>floating Parameter Adjustment button</strong> (bottom-right) to open parameter controls</li>
+                <li>Choose <strong>Manual</strong> tab for sliders/toggles or <strong>AI Assistant</strong> tab for natural language control</li>
+                <li>Switch between chart views to see different aspects of the simulation</li>
                 <li>Use "Reset" to start over with new settings</li>
               </ol>
+              
+              <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '12px' }}>🎛️ Parameter Adjustment</h3>
+              <div style={{ marginLeft: '20px', marginBottom: '20px' }}>
+                <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px', color: '#667eea' }}>Manual Mode (Recommended for Precision)</h4>
+                <ul style={{ paddingLeft: '20px', marginBottom: '16px' }}>
+                  <li>Direct control with modern sliders and toggles</li>
+                  <li>Real-time feedback with toast notifications</li>
+                  <li>Organized parameter groups: Core, Environmental, Baseline, Timing</li>
+                  <li>Instant simulation updates as you adjust</li>
+                </ul>
+                
+                <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px', color: '#764ba2' }}>AI Assistant Mode (Natural Language)</h4>
+                <ul style={{ paddingLeft: '20px', marginBottom: '16px' }}>
+                  <li>Type or speak requests: <em>"Make it more resilient"</em></li>
+                  <li>Complex scenarios: <em>"Simulate a crisis at day 80 lasting 25 days"</em></li>
+                  <li>Review and approve suggestions before applying</li>
+                  <li>Voice input via microphone button</li>
+                  <li>Conversation history for context</li>
+                </ul>
+              </div>
               <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '12px' }}>📊 Chart Guide</h3>
               <ul style={{ paddingLeft: '20px' }}>
                 <li>System Stocks: Core community capabilities</li>
@@ -1074,53 +1805,15 @@ export default function App() {
           </div>
         </div>
 
-        {/* Settings Panel */}
-        {showSettings && (
-          <div style={{
-            backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: '12px',
-            padding: '24px', marginBottom: '24px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', border: '1px solid #e5e7eb'
-          }}>
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1f2937', marginBottom: '24px' }}>
-              ⚙️ Parameters
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px' }}>
-              {paramsConfig.map(({ key, label, min, max, step, type }) =>
-                <div key={key} style={{ margin: '0.75rem 0' }}>
-                  <label style={{ fontWeight: 500, marginRight: '0.5rem', display: 'block', marginBottom: '8px' }}>{label}</label>
-                  {type === 'checkbox' ? (
-                    <input
-                      type="checkbox"
-                      checked={!!params[key]}
-                      onChange={e => handleParamChange(key, e.target.checked)}
-                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                    />
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <input
-                        type="range"
-                        min={min}
-                        max={max}
-                        step={step}
-                        value={params[key]}
-                        onChange={e => handleParamChange(key, parseFloat(e.target.value))}
-                        style={{ flex: 1, cursor: 'pointer' }}
-                      />
-                      <span style={{ marginLeft: '0.5rem', fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>
-                        {params[key].toFixed(step < 1 ? 2 : 0) + (step < 1 ? '' : ' days')}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Conversational Assistant */}
-        <ConversationalAssistant
+        {/* Modern Parameter Adjustment Panel */}
+        <ModernParameterPanel
+          isOpen={showParameterPanel}
+          onToggle={() => setShowParameterPanel(!showParameterPanel)}
+          mode={parameterMode}
+          onModeChange={setParameterMode}
+          params={params}
           onParameterChange={handleParamChange}
-          isOpen={showAssistant}
-          onToggle={() => setShowAssistant(!showAssistant)}
+          paramsConfig={paramsConfig}
         />
 
       </div>
